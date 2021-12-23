@@ -28,7 +28,7 @@ class TsvWriter():
                     rest = 10 - (self.rev_sent_id % 10)
                     self.rev_sent_id += rest
                 if (self.resp_sent_id % 10) != 0:
-                    rest = 10 - (self.rev_sent_id % 10)
+                    rest = 10 - (self.resp_sent_id % 10)
                     self.resp_sent_id += rest
 
 
