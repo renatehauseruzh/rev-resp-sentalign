@@ -3,7 +3,7 @@ import spacy
 import argparse
 
 
-class TsvWriter():
+class SentenceSplitter():
 
     def __init__(self, infile, outfile):
         self.infile = infile
@@ -96,8 +96,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    tsv_writer = TsvWriter(infile=args.infile, outfile=args.outfile)
-    tsv_writer.write_tsv()
+    splitter = SentenceSplitter(infile=args.infile, outfile=args.outfile)
+    splitter.write_tsv()
 
 
 if __name__ == '__main__':
