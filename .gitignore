@@ -2,7 +2,8 @@
 data/trip_hotels.csv
 data/trip_hotels_test.csv
 data/test_out.tsv
-
+data/trip_hotels_dev_sm.csv
+data/tryout
 
 # pycharm
 .idea
