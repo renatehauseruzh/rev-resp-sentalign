@@ -12,24 +12,25 @@ class Similarity():
 
     def calculate_similarities(self, doc):
         # get doc in following format: {rev: {sent_id1: sent1, sent_id2: sent2}, resp: {resp_sentid1: resp_sent1, resp_sentid2: resp_sent2}}
+        # get doc as Document object
         similarity_matrix = {}  # {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
-        for rev_id, rev_sent in doc['rev'].items():
+        for rev_id, rev_sent in doc.rev_sents.items():
             similarities = {}
-            for resp_id, resp_sent in doc['resp'].items():
-                similarity = self.chrF(rev_sent, resp_sent)
+            for resp_id, resp_sent in doc.resp_sents.items():
+                similarity = self._chrF(rev_sent, resp_sent)
                 similarities[resp_id] = similarity
             similarity_matrix[rev_id] = similarities
         return similarity_matrix  # {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
 
-    def create_ngrams(self, sent):
+    def _create_ngrams(self, sent):
         ngram_tups = ngrams(sent, self.order)
         grams = ["".join(tup) for tup in ngram_tups]
         return grams
 
-    def chrF(self, ref_sent, hyp_sent):
+    def _chrF(self, ref_sent, hyp_sent):
 
-        ref_ngrams = self.create_ngrams(ref_sent)
-        hyp_ngrams = self.create_ngrams(hyp_sent)
+        ref_ngrams = self._create_ngrams(ref_sent)
+        hyp_ngrams = self._create_ngrams(hyp_sent)
 
         ref_ngram_counts = Counter(ref_ngrams)
         hyp_ngram_counts = Counter(hyp_ngrams)
