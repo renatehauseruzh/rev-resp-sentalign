@@ -80,7 +80,6 @@ class Aligner():
             self.uaid += rest
 
 
-
 class Document():
 
     def __init__(self, doc_data):
@@ -88,13 +87,8 @@ class Document():
         self.id = doc_data['doc_id']
         self.rev_ids = list(doc_data['rev'].keys())
         self.resp_ids = list(doc_data['resp'].keys())
-        self.rev_sents = doc_data['rev'] # mapping review id / review sent
+        self.rev_sents = doc_data['rev']  # mapping review id / review sent
         self.resp_sents = doc_data['resp']  # mapping response id / response sent
-        # review sents
-        # response sents
-        # mapping similarity matrix: for each review all responses
-        # mapping review id / uaid
-        # mapping resp id / uaid
 
     def _get_similarity_matrix(self):
         ...
@@ -123,10 +117,6 @@ class Document():
                     padded_resp_ids.append('')
                     i += 1
         return padded_rev_ids, padded_resp_ids
-
-
-    # TODO: find out what datastructures are needed
-    ...
 
 
 ###########################################################################################
