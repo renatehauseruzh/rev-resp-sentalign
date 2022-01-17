@@ -4,8 +4,8 @@ import argparse
 import spacy
 import time
 import nltk
-import similarity_v3
-import convert_format_v2
+import similarity
+import convert_format
 from itertools import groupby
 
 
