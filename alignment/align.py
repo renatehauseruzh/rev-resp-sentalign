@@ -156,10 +156,10 @@ def parse_args():
 
     parser.add_argument('infile', help="path to the sentence segmented file")
     parser.add_argument('outfile', help="path to the file with the similarity matrices")
-    #parser.add_argument('--out-format', choices=['tsv', 'json'], default='json')
     parser.add_argument('--scoring', choices=['ngram', 'sentence embedding'], default='ngram')
     parser.add_argument('--ngram-order', type=int, default=6)  # default=6 in Popovic, 2015
-    parser.add_argument('--threshold', type=float, default=0.5) # TODO: has to be investigated
+    parser.add_argument('--model', type=str, default='sentence-transformers/nli-mpnet-base-v2', help="a string specifying a SentenceTransformers model")
+    parser.add_argument('--threshold', type=float, default=0.4)
     parser.add_argument('--lowercase', action='store_true', help="sentences are lowercased before similarity score is computed")
     parser.add_argument('--stopwords', action='store_true', help='remove stopwords before similarity score is calculated')
     parser.add_argument('--mode', choices=['evaluate', 'align'], default='evaluate') # TODO: change default to align later
@@ -176,12 +176,12 @@ def main():
 
     aligner = Aligner(args.threshold)
     if args.scoring == 'ngram':
-        simc = similarity_v3.Similarity(args.ngram_order, args.lowercase, args.stopwords)
+        simc = similarity.Similarity(args.ngram_order, args.lowercase, args.stopwords)
     else:
-        simc = similarity_v3.SentTransformerSimilarity()
+        simc = similarity.SentTransformerSimilarity(args.model)
 
     if args.mode == 'evaluate':
-        converter = convert_format_v2.FormatConverter(infile=args.infile, outfile=args.outfile, delimiter=',')
+        converter = convert_format.FormatConverter(infile=args.infile, outfile=args.outfile, delimiter=',')
         data = converter.convert_data()
     else:
         # generator
@@ -200,6 +200,7 @@ def main():
             doc['alignment'] = alignments
 
             aligned.append(doc)
+        # TODO: make other metadata for senttransformer
         aligned_file = {'meta': {'n-gram order': args.ngram_order, 'threshold': args.threshold}, 'alignment': aligned}
         json.dump(aligned_file, outf, indent=4) # format could also be changed to jsonl if data is too big to hold in memory
 
