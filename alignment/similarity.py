@@ -68,9 +68,9 @@ class Similarity():
 
 class SentTransformerSimilarity():
 
-    def __init__(self):
+    def __init__(self, model):
         # ev. model?
-        self.model = SentenceTransformer('sentence-transformers/paraphrase-MiniLM-L3-v2') # nli-mpnet-base-v2
+        self.model = SentenceTransformer(model) # sentence-transformers/nli-mpnet-base-v2  'sentence-transformers/paraphrase-MiniLM-L3-v2'
 
     def calculate_similarities(self, doc):
         # get doc in following format: {'doc_id': id, 'review': ['asdfa', 'asdfa'], 'response': ['fasdf', 'fds'¨]
