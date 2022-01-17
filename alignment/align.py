@@ -1,97 +1,255 @@
-import argparse
-import json
 import csv
-
-
-# TODO: CLI that takes:
-#   - filenames
-#       - infile similarities (json)
-#       - infile split sentences (json)
-#       - outfile (tsv)
-#   - threshold (?)
-
-
-
-# TODO: extract alignments
-#   - find all above threshold
-#   - assign alignment IDs
-#   - save in suitable data structure
+import json
+import argparse
+import spacy
+import time
+import nltk
+import similarity_v3
+import convert_format_v2
+from itertools import groupby
 
 
 class Aligner():
+    # only one instance of this should be created at the beginning of the process
 
-    def __init__(self, threshold, corpus_filename):
+    def __init__(self, threshold):
         self.threshold = threshold
-        self.alignment_id = 0
-        with open(corpus_filename, 'r', encoding='utf-8') as infile:
-            self.sent_split_corpus = json.load(infile)
 
-    # TODO: receive similarities in json format with IDs only
+    def extract_alignments_v2(self, sim_matrix):
+        """
+        for a given similarity matrix of a document, extract the alignments
+        :param sim_matrix: dict of format {revsent_id1: {resp_id1: sim1, resp_id2: sim2}, revsent_id2: {...} }
+        :return: dicts with sentence IDs as keys and alignment IDs as values?
+        """
 
-    # TODO: for each doc, extract all pairs that have similarity above threshold
+        candidates = self._get_candidates(sim_matrix=sim_matrix)
+
+        # format of alignments: [(rev_id1, resp_id2), (rev_id1, resp_id3), (rev_id2, resp_id4)]
+        buckets = []
+        while candidates:
+            # get first element in the list
+            el = candidates.pop(0)
+
+            # if only one element was left, this forms a bucket by itself
+            if len(candidates) == 0:
+                bucket = [el]
+                buckets.append(bucket)
+            # put all alignments that have either same resp_id or rev_id than first element into a bucket
+            #bucket = [(rev, resp) for (rev, resp) in candidates if rev == el[0] or resp == el[1]]
+            else:
+                # TODO: try if this solves the problem: make bucket directly [[rev_candidate], [resp_candidate]]
+                #bucket = [el]
+                bucket = [[el[0]], [el[1]]]
+                leftover = []
+                while candidates != leftover:
+                    candidates = leftover
+                    leftover = []
+                    for rev, resp in candidates:
+                        # TODO: try out if this solves the problem:
+                        if rev in bucket[0] or resp in bucket[1]:
+                            bucket[0].append(rev)
+                            bucket[1].append(resp)
+                        #if rev == el[0] or resp == el[1]:
+                        #    bucket.append((rev, resp))
+                        else:
+                            leftover.append((rev, resp))
+
+                # save bucket to a list
+                buckets.append(bucket)
+                # only keep on searching in candidates that don't belong to any bucket yet
+                candidates = leftover
+
+        # TODO: this is not necessary anymore with approach above
+        #alignments = []
+        #for bucket in buckets:
+        #    rev_als = []
+        #    resp_als = []
+        #    for rev, resp in bucket:
+        #        if rev not in rev_als:
+        #            rev_als.append(rev)
+        #        if resp not in resp_als:
+        #            resp_als.append(resp)
+        #    alignments.append((rev_als, resp_als))
+        #return alignments  # list: [([i1, i2, i3], [i1, i2]), (...), (...)]
+        return buckets
+
+    def extract_alignments(self, sim_matrix): #sim_matrix
+        candidates = self._get_candidates(sim_matrix=sim_matrix)
+        key_func = lambda x: x[0]
+        rev_resp_pairs = []
+        for key, group in groupby(candidates, key_func):
+            rev_resp_pairs.append(([key], [i[1] for i in group]))
+        buckets = []
+        while rev_resp_pairs:
+            el = rev_resp_pairs.pop()
+            bucket = [set(el[0]), set(el[1])]
+            leftover = []
+            for rev, resp in rev_resp_pairs:
+                if bool(bucket[1] & set(resp)):
+                    bucket[0].update(rev)
+                    bucket[1].update(resp)
+                else:
+                    leftover.append((rev, resp))
+            bucket = [list(bucket[0]), list(bucket[1])]
+            buckets.append(bucket)
+            rev_resp_pairs = leftover
+        return buckets
 
 
-    # TODO: assign unique alignment ID:
-    #   - 1-to-1: assign ID if one rev sent has exactly one resp sent above threshold
-    #   - 1-to-many: if one rev sent has several resp sents above threshold: same ID
-    #   - many-to-1: if several rev sents have the same resp sent above threshold: same ID
-    #   - many-to-many:
-    #   -
-    #   -
 
-    def get_alignments(self, doc):
-        # format of doc: {rev_sent_id1: {resp_id1: sim1, resp_id2: sim2}, rev_sent_id2: {resp_id1: sim3, resp_id2: sim4}}
+
+    def _get_candidates(self, sim_matrix):
+        """
+        Get all rev-resp pairs that have a similarity above the specified threshold
+        :param sim_matrix: dict of format {revsent_id1: {resp_id1: sim1, resp_id2: sim2}, rev_sent_id2: {...}}
+        :return alignments: list of format [(rev_id1, resp_id2), (rev_id1, resp_id3), (rev_id2, resp_id4)]
+        """
         alignments = []
-        for rev_sent_id, responses in doc.items():
+        for rev_sent_id, responses in sim_matrix.items():
 
             for resp_sent_id, sim in responses.items():
                 if sim >= self.threshold:
-                    alignments.append((rev_sent_id, resp_sent_id))
-
+                    alignments.append((str(rev_sent_id), str(resp_sent_id)))
         return alignments
 
-    def assign_alignment_ids(self, alignments, doc_id):
-        # format of alignments: [(rev_id1, resp_id2), (rev_id1, resp_id3), (rev_id2, resp_id4)]
-        buckets = []
-        while alignments:
-            # get first element in the list
-            el = alignments.pop(0)
-            # put all alignments that have either same resp_id or rev_id than first element into a bucket
-            bucket = [(rev, resp) for (rev, resp) in alignments if rev==el[0] or resp==el[1]]
-            bucket.append(el)
-            # save bucket to a list
-            buckets.append(bucket)
 
-        for bucket in buckets:
-            # each bucket gets an alignment ID
-            self.alignment_id += 1
-            for alignment in bucket:
-                # find the review and response sentence in the corpus and save alignment ID along with them
-                self.sent_split_corpus[doc_id][alignment[0]]['UAID'] = self.alignment_id
-                self.sent_split_corpus[doc_id][alignment[1]]['UAID'] = self.alignment_id
+###########################################################################################
+# UTILITY FUNCTIONS FOR READING AND WRITING FILES
+###########################################################################################
+def read_and_split_data(filename):
+    """
+    Read in data from csv corpus file and split sentences
+    :param filename:
+    :return:
+    """
+    nlp = spacy.load('en_core_web_md')
+    with open(filename, 'r', encoding='utf-8') as infile:
+        reader = csv.reader(infile, delimiter=',')
+        for line in reader:
+            doc_data = {}
+            # get relevant data from the line
+            document_id = str(line[0])
+            review = line[5]
+            response = line[6]
+            # do sentence segmentation
+            rev_doc = nlp(review)
+            resp_doc = nlp(response)
+            rev_sents, resp_sents = list(rev_doc.sents), list(resp_doc.sents)
 
-    def write_tsv(self, filename):
-        with open(filename, 'w', newline='', encoding='utf-8') as outf:
-            # headers
-            tsv_writer = csv.writer(outf, delimiter='\t')
-            tsv_writer.writerow(['DOCID', 'REVIEW SENTID', 'REVIEW SENT', 'REVIEW AUID', 'RESPONSE SENTID', 'RESPONSE SENT', 'RESPONSE AUID'])
+            doc_data['doc_id'] = document_id
+            doc_data['review'] = rev_sents
+            doc_data['response'] = resp_sents
 
-            for doc_id in self.sent_split_corpus.keys():
-                # as many lines as the longer list (rev or resp) is long
-                length_rev = len(self.sent_split_corpus[doc_id]['rev'].keys())
-                length_resp = len(self.sent_split_corpus[doc_id]['resp'].keys())
-                longer = length_rev if length_rev >= length_resp else length_resp
-                i = 0
-                # write a row for each sentence in rev and resp
-                while i < longer:
-                    rev_id = self.sent_split_corpus[doc_id]['rev'].keys()[i]
-                    resp_id = self.sent_split_corpus[doc_id]['resp'].keys()[i]
+            yield doc_data
 
-                    rev_sent = self.sent_split_corpus[doc_id]['rev'][rev_id]['sent']
-                    resp_sent = self.sent_split_corpus[doc_id]['resp'][resp_id]['sent']
 
-                    rev_uaid = self.sent_split_corpus[doc_id]['rev'][rev_id]['UAID']
-                    resp_uaid = self.sent_split_corpus[doc_id]['resp'][resp_id]['UAID']
 
-                    row = (doc_id, rev_id, rev_sent, rev_uaid, resp_id, resp_sent, resp_uaid)
-                    tsv_writer.writerow(row)
+
+
+###########################################################################################
+# COMMAND LINE INTERFACE
+###########################################################################################
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('infile', help="path to the sentence segmented file")
+    parser.add_argument('outfile', help="path to the file with the similarity matrices")
+    #parser.add_argument('--out-format', choices=['tsv', 'json'], default='json')
+    parser.add_argument('--scoring', choices=['ngram', 'sentence embedding'], default='ngram')
+    parser.add_argument('--ngram-order', type=int, default=6)  # default=6 in Popovic, 2015
+    parser.add_argument('--threshold', type=float, default=0.5) # TODO: has to be investigated
+    parser.add_argument('--lowercase', action='store_true', help="sentences are lowercased before similarity score is computed")
+    parser.add_argument('--stopwords', action='store_true', help='remove stopwords before similarity score is calculated')
+    parser.add_argument('--mode', choices=['evaluate', 'align'], default='evaluate') # TODO: change default to align later
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+
+    #nltk.download('punkt')
+    #nltk.download('stopwords')
+
+    aligner = Aligner(args.threshold)
+    if args.scoring == 'ngram':
+        simc = similarity_v3.Similarity(args.ngram_order, args.lowercase, args.stopwords)
+    else:
+        simc = similarity_v3.SentTransformerSimilarity()
+
+    if args.mode == 'evaluate':
+        converter = convert_format_v2.FormatConverter(infile=args.infile, outfile=args.outfile, delimiter=',')
+        data = converter.convert_data()
+    else:
+        # generator
+        data = read_and_split_data(args.infile)
+
+    with open(args.outfile, 'w', encoding='utf-8') as outf:
+        aligned = []
+        for doc in data:
+            # doc is a dict: {'doc_id': id, 'review': ['asdkjf', 'sadfas', 'asdfasd'], 'response': ['resrs', 'resrs']}
+
+            similarities = simc.calculate_similarities(doc=doc)
+
+            # extract alignments
+            alignments = aligner.extract_alignments(sim_matrix=similarities)
+
+            doc['alignment'] = alignments
+
+            aligned.append(doc)
+        aligned_file = {'meta': {'n-gram order': args.ngram_order, 'threshold': args.threshold}, 'alignment': aligned}
+        json.dump(aligned_file, outf, indent=4) # format could also be changed to jsonl if data is too big to hold in memory
+
+
+
+
+if __name__ == '__main__':
+    main()
+    #aligner = Aligner(threshold=0.5)
+    #candidates = [(0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (2, 4), (3, 5)]
+    #alignments = aligner.extract_alignments_v2(candidates)
+    #print(alignments)
+
+
+
+
+
+
+
+
+
+
+
+##########################################################
+# id_bucket = []
+#             for i in range(0, len(candidates)):
+#                 rev = candidates[i][0]
+#                 resp = candidates[i][1]
+#                 if rev == el[0] or resp == el[1]:
+#                     id_bucket.append(i)
+#
+#             for id in id_bucket:
+#                 pair = candidates[id]
+#                 bucket.append(pair)
+#
+#             for id in id_bucket:
+#                 candidates.remove(id)
+#             bucket.append(el)
+
+
+
+
+#         for bucket in buckets:
+#             # each bucket gets a unique alignment ID
+#             aid = str(i)
+#             alignments[aid] = {'review': [], 'response': []}
+#             for rev, resp in bucket:
+#                 if rev not in alignments[aid]['review']:
+#                     alignments[aid]['review'].append(rev)
+#                 if resp not in alignments[aid]['response']:
+#                     alignments[aid]['response'].append(resp)
+#             i += 1
+#         return alignments

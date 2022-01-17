@@ -2,9 +2,23 @@
 data/trip_hotels.csv
 data/trip_hotels_test.csv
 data/test_out.tsv
+data/trip_hotels_dev_sm.csv
 #data/trip_hotels_dev_sm.csv
 data/tryout
 data/dev_sm
+
+data/conversion
+data/evaluation
+data/results
+data/aligned_gs
+
+data/goldstandard/rev-resp-goldstandard_v2_annotated_1000.csv
+
+
+alignment/old_approaches
+alignment/visualize_results
+
+scripts/tryouts
 # pycharm
 .idea
 

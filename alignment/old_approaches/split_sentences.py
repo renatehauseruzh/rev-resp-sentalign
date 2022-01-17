@@ -1,4 +1,5 @@
 import csv
+import json
 import spacy
 import argparse
 
@@ -82,6 +83,43 @@ class SentenceSplitter():
                     row = (doc_id,) + sent[0] + sent[1]
                     tsv_writer.writerow(row)
                 tsv_writer.writerow('')
+
+
+# TODO: ev. find common functionality
+# TODO: class to split and write json(l)
+class SentenceSplitterJson():
+
+    def __init__(self, infile, outfile):
+        self.infile = infile
+        self.outfile = outfile
+        self.nlp = spacy.load('en_core_web_md')
+
+    def split_sentences(self):
+        segmented = []
+        with open(self.infile, 'r', encoding='utf-8') as infile:
+            reader = csv.reader(infile, delimiter=',')
+            for line in reader:
+                # get relevant data from the line
+                document_id = line[0]
+                review = line[5]
+                response = line[6]
+            # do sentence segmentation
+            rev_doc = self.nlp(review)
+            resp_doc = self.nlp(response)
+            rev_sents, resp_sents = list(rev_doc.sents), list(resp_doc.sents)
+            # save segmented document in json datastructure (dict)
+            seg_doc = {'doc_id': document_id, 'review': rev_sents, 'response': resp_sents}
+            segmented.append(seg_doc)
+        return segmented
+
+    def write_json(self, segmented):
+        with open(self.outfile, 'w', encoding='utf-8') as outf:
+            json.dump(segmented, outf, indent=4)
+
+
+
+
+
 
 # command line interface
 def parse_args():
