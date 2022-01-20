@@ -16,27 +16,46 @@ class Similarity():
         self.remove_stopwords = stopwords
 
     def calculate_similarities(self, doc):
-        # get doc in following format: {'doc_id': id, 'review': ['asdfa', 'asdfa'], 'response': ['fasdf', 'fds'¨]
-        similarity_matrix = {}  # {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
+        """
+        Compute similarity scores for every review-response sentence pair in a document
+        :param doc: dict in format {'doc_id': id, 'review': ['asdfa', 'asdfa'], 'response': ['fasdf', 'fds'¨]
+        :return: similarity matrix: dict in format {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
+        """
+        similarity_matrix = {}
+        # Compute similarity score for every review-response sentence pair
         for rev_id, rev_sent in enumerate(doc['review']):
             similarities = {}
             for resp_id, resp_sent in enumerate(doc['response']):
+                # use chrF metric to compute similarity
                 similarity = self._chrF(rev_sent, resp_sent)
                 similarities[resp_id] = similarity
             similarity_matrix[rev_id] = similarities
-        return similarity_matrix  # {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
+        return similarity_matrix
 
     def _create_ngrams(self, sent):
+        """
+        Create character n-grams for a sentence
+        :param sent: string
+        :return: grams: list of character n-gram strings
+        """
+        # lowercase and remove stopwords, if options are given
         if self.lowercase:
             sent = sent.lower()
         if self.remove_stopwords:
             #sent = " ".join([w for w in word_tokenize(sent) if w not in stopwords.words('english')])
             sent = remove_stopwords(sent)
+        # create character n-grams
         ngram_tups = ngrams(sent, self.order)
         grams = ["".join(tup) for tup in ngram_tups]
         return grams
 
     def _chrF(self, ref_sent, hyp_sent):
+        """
+        Compute chrF metric according to Popovic (2016)
+        :param ref_sent: string review sentence
+        :param hyp_sent: string response sentence
+        :return: chrF: float similarity score
+        """
 
         ref_ngrams = self._create_ngrams(ref_sent)
         hyp_ngrams = self._create_ngrams(hyp_sent)
@@ -46,19 +65,21 @@ class Similarity():
 
         overlap_count = 0
         for ngram in hyp_ngram_counts.keys():
-            # wenn es nicht existiert, nicht zählen
+            # if ngram doesn't exist in the review sentence, don't count it
             if ngram not in ref_ngram_counts.keys():
                 continue
-            # wenn es existiert, und weniger oder gleich oft vorkommt wie in ref += dieser value
+            # if it exists and occurs less or equally often than in review count it as many times
             if hyp_ngram_counts[ngram] <= ref_ngram_counts[ngram]:
                 overlap_count += hyp_ngram_counts[ngram]
-            # wenn es öfter vorkommt als in ref += value von ref
+            # if it occurs more often than in the review, only count the number of occurrences in the review
             elif hyp_ngram_counts[ngram] > ref_ngram_counts[ngram]:
                 overlap_count += ref_ngram_counts[ngram]
 
+        # precision and recall
         chrP = overlap_count / len(hyp_ngrams) if len(hyp_ngrams) > 0 else 0
         chrR = overlap_count / len(ref_ngrams) if len(ref_ngrams) > 0 else 0
 
+        # chrF
         if chrP == 0 and chrR == 0:
             return 0
         else:
@@ -69,24 +90,28 @@ class Similarity():
 class SentTransformerSimilarity():
 
     def __init__(self, model):
-        # ev. model?
-        self.model = SentenceTransformer(model) # sentence-transformers/nli-mpnet-base-v2  'sentence-transformers/paraphrase-MiniLM-L3-v2'
+        self.model = SentenceTransformer(model) # sentence-transformers/nli-mpnet-base-v2 or 'sentence-transformers/paraphrase-MiniLM-L3-v2'
 
     def calculate_similarities(self, doc):
-        # get doc in following format: {'doc_id': id, 'review': ['asdfa', 'asdfa'], 'response': ['fasdf', 'fds'¨]
-
+        """
+        Compute similarity scores for every review-response sentence pair in a document
+        :param doc: dict in format {'doc_id': id, 'review': ['asdfa', 'asdfa'], 'response': ['fasdf', 'fds'¨]
+        :return: similarity matrix: dict in format {rev_id1: {resp_id1: 0.0, resp_id2: 0.1}, rev_id2: {resp_id1: 0.2, resp_id2: 0.3}}
+        """
         review = doc['review']
         response = doc['response']
 
-        #print(len(review))
         if not review:
             return {}
 
+        # get sentence embeddings of review and response sentences
         rev_embeddings = self.model.encode(review, convert_to_tensor=True)
         resp_embeddings = self.model.encode(response, convert_to_tensor=True)
 
+        # get cosine similarity for all pairs
         cosine_scores = util.cos_sim(rev_embeddings, resp_embeddings)
         similarity_matrix = {}
+        # create similarity matrix
         for rev_id, resps in enumerate(cosine_scores):
 
             similarities = {}
@@ -97,6 +122,7 @@ class SentTransformerSimilarity():
         return similarity_matrix
 
 def main():
+    # for basic testing
     doc = {
         "doc_id": "3287424",
         "review": [
