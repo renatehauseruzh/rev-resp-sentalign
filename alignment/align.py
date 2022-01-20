@@ -15,88 +15,36 @@ class Aligner():
     def __init__(self, threshold):
         self.threshold = threshold
 
-    def extract_alignments_v2(self, sim_matrix):
-        """
-        for a given similarity matrix of a document, extract the alignments
-        :param sim_matrix: dict of format {revsent_id1: {resp_id1: sim1, resp_id2: sim2}, revsent_id2: {...} }
-        :return: dicts with sentence IDs as keys and alignment IDs as values?
-        """
-
-        candidates = self._get_candidates(sim_matrix=sim_matrix)
-
-        # format of alignments: [(rev_id1, resp_id2), (rev_id1, resp_id3), (rev_id2, resp_id4)]
-        buckets = []
-        while candidates:
-            # get first element in the list
-            el = candidates.pop(0)
-
-            # if only one element was left, this forms a bucket by itself
-            if len(candidates) == 0:
-                bucket = [el]
-                buckets.append(bucket)
-            # put all alignments that have either same resp_id or rev_id than first element into a bucket
-            #bucket = [(rev, resp) for (rev, resp) in candidates if rev == el[0] or resp == el[1]]
-            else:
-                # TODO: try if this solves the problem: make bucket directly [[rev_candidate], [resp_candidate]]
-                #bucket = [el]
-                bucket = [[el[0]], [el[1]]]
-                leftover = []
-                while candidates != leftover:
-                    candidates = leftover
-                    leftover = []
-                    for rev, resp in candidates:
-                        # TODO: try out if this solves the problem:
-                        if rev in bucket[0] or resp in bucket[1]:
-                            bucket[0].append(rev)
-                            bucket[1].append(resp)
-                        #if rev == el[0] or resp == el[1]:
-                        #    bucket.append((rev, resp))
-                        else:
-                            leftover.append((rev, resp))
-
-                # save bucket to a list
-                buckets.append(bucket)
-                # only keep on searching in candidates that don't belong to any bucket yet
-                candidates = leftover
-
-        # TODO: this is not necessary anymore with approach above
-        #alignments = []
-        #for bucket in buckets:
-        #    rev_als = []
-        #    resp_als = []
-        #    for rev, resp in bucket:
-        #        if rev not in rev_als:
-        #            rev_als.append(rev)
-        #        if resp not in resp_als:
-        #            resp_als.append(resp)
-        #    alignments.append((rev_als, resp_als))
-        #return alignments  # list: [([i1, i2, i3], [i1, i2]), (...), (...)]
-        return buckets
-
     def extract_alignments(self, sim_matrix): #sim_matrix
         candidates = self._get_candidates(sim_matrix=sim_matrix)
+        # sort by review ids
         key_func = lambda x: x[0]
         rev_resp_pairs = []
+        # key is the review id, group contains all rev-resp sentence pairs that contain the key review ID
         for key, group in groupby(candidates, key_func):
+            # append a tuple to rev_resp_pairs: (["revid1"], ["respid1", "respid2", "respid3"])
             rev_resp_pairs.append(([key], [i[1] for i in group]))
+
+        # create n:m-alignments
         buckets = []
         while rev_resp_pairs:
+            # create a new n:m-alignment (bucket)
             el = rev_resp_pairs.pop()
             bucket = [set(el[0]), set(el[1])]
             leftover = []
             for rev, resp in rev_resp_pairs:
+                # if there is an overlap of resp sents in the bucket and in the candidate, add review id and response ids to this bucket
                 if bool(bucket[1] & set(resp)):
+                    # add review and response sentences to the n:m-alignment
                     bucket[0].update(rev)
                     bucket[1].update(resp)
                 else:
                     leftover.append((rev, resp))
             bucket = [list(bucket[0]), list(bucket[1])]
             buckets.append(bucket)
+            # keep on producing alignments with the remaining pairs
             rev_resp_pairs = leftover
         return buckets
-
-
-
 
     def _get_candidates(self, sim_matrix):
         """
@@ -106,7 +54,7 @@ class Aligner():
         """
         alignments = []
         for rev_sent_id, responses in sim_matrix.items():
-
+            # if similarity score is above threshold, this is a candidate
             for resp_sent_id, sim in responses.items():
                 if sim >= self.threshold:
                     alignments.append((str(rev_sent_id), str(resp_sent_id)))
@@ -114,7 +62,7 @@ class Aligner():
 
 
 ###########################################################################################
-# UTILITY FUNCTIONS FOR READING AND WRITING FILES
+# UTILITY FUNCTION FOR READING FILES
 ###########################################################################################
 def read_and_split_data(filename):
     """
@@ -141,8 +89,6 @@ def read_and_split_data(filename):
             doc_data['response'] = resp_sents
 
             yield doc_data
-
-
 
 
 
@@ -175,16 +121,19 @@ def main():
     #nltk.download('stopwords')
 
     aligner = Aligner(args.threshold)
+
+    # similarity scoring strategy
     if args.scoring == 'ngram':
         simc = similarity.Similarity(args.ngram_order, args.lowercase, args.stopwords)
     else:
         simc = similarity.SentTransformerSimilarity(args.model)
 
+    # if it is in evaluate mode, the goldstandard files need to be converted, data is loaded into memory
     if args.mode == 'evaluate':
         converter = convert_format.FormatConverter(infile=args.infile, outfile=args.outfile, delimiter=',')
         data = converter.convert_data()
     else:
-        # generator
+        # if large file should be aligned, generator so that not all data is loaded into memory
         data = read_and_split_data(args.infile)
 
     with open(args.outfile, 'w', encoding='utf-8') as outf:
@@ -203,8 +152,6 @@ def main():
         # TODO: make other metadata for senttransformer
         aligned_file = {'meta': {'n-gram order': args.ngram_order, 'threshold': args.threshold}, 'alignment': aligned}
         json.dump(aligned_file, outf, indent=4) # format could also be changed to jsonl if data is too big to hold in memory
-
-
 
 
 if __name__ == '__main__':
@@ -254,3 +201,50 @@ if __name__ == '__main__':
 #                     alignments[aid]['response'].append(resp)
 #             i += 1
 #         return alignments
+
+
+
+
+
+#     def extract_alignments_v2(self, sim_matrix):
+#         """
+#         for a given similarity matrix of a document, extract the alignments
+#         :param sim_matrix: dict of format {revsent_id1: {resp_id1: sim1, resp_id2: sim2}, revsent_id2: {...} }
+#         :return: buckets: list of the format [ [[revid1, revid2], [respid1]], [[revid3], [respid2, respid3]], ...]
+#         """
+#
+#         # extract all candidate pairs where similarity score is above threshold
+#         candidates = self._get_candidates(sim_matrix=sim_matrix)
+#
+#         # format of alignments: [(rev_id1, resp_id2), (rev_id1, resp_id3), (rev_id2, resp_id4)]
+#         buckets = []
+#         while candidates:
+#             # get first element in the list to compare rest of the list to it
+#             el = candidates.pop(0)
+#
+#             # if only one element was left, this forms a bucket by itself
+#             if len(candidates) == 0:
+#                 bucket = [el]
+#                 buckets.append(bucket)
+#             # put all alignments that have either same resp_id or rev_id as first element into a bucket
+#             else:
+#                 bucket = [[el[0]], [el[1]]]
+#                 leftover = []
+#                 while candidates != leftover:
+#                     candidates = leftover
+#                     leftover = []
+#                     for rev, resp in candidates:
+#                         if rev in bucket[0] or resp in bucket[1]:
+#                             bucket[0].append(rev)
+#                             bucket[1].append(resp)
+#                         #if rev == el[0] or resp == el[1]:
+#                         #    bucket.append((rev, resp))
+#                         else:
+#                             leftover.append((rev, resp))
+#
+#                 # save bucket to a list
+#                 buckets.append(bucket)
+#                 # only keep on searching in candidates that don't belong to any bucket yet
+#                 candidates = leftover
+#
+#         return buckets
