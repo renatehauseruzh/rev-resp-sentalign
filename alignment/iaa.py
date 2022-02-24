@@ -52,8 +52,6 @@ def cohens_kappa(infile):
             if 'REVIEW SENTID' in line:
                 continue
 
-
-
             # a rev-resp pair is complete if such a formatting line is hit
             if line == ['', '', '', '', '', '', '', ''] or not line:
                 # loop over all rev_sent/resp_sent pairs in a doc
@@ -126,7 +124,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--gs_file', required=True, help="path to the double annotated gold standard")
-    parser.add_argument('--metric', required=True, choices=['cohens-k', 'agr'], help="path to the file where the statistics should be stored")
+    parser.add_argument('--metric', required=True, choices=['cohens-k', 'agr'], help="the metric to compute the IAA")
 
     args = parser.parse_args()
     return args
