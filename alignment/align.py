@@ -82,7 +82,9 @@ def read_and_split_data(filename):
             # do sentence segmentation
             rev_doc = nlp(review)
             resp_doc = nlp(response)
-            rev_sents, resp_sents = list(rev_doc.sents), list(resp_doc.sents)
+            #rev_sents, resp_sents = list(rev_doc.sents), list(resp_doc.sents)
+            rev_sents = [str(sent) for sent in rev_doc.sents]
+            resp_sents = [str(sent) for sent in resp_doc.sents]
 
             doc_data['doc_id'] = document_id
             doc_data['review'] = rev_sents
