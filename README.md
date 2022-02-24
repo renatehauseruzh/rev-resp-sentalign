@@ -141,3 +141,9 @@ Use the script as follows:
       -h, --help                show this help message and exit
       --gs_file GS_FILE         path to the double annotated gold standard
       --metric {cohens-k,agr}   the metric to compute the IAA
+
+
+## Results
+For the n-gram based appraoch, the settings with n=4/th=0.12, n=5/th=0.08, and n=6/th=0.06
+yield the best results. For the approach using sentence embeddings, for both models a threshold of 0.4
+is most beneficial. All these five candidates perform similarly well.
