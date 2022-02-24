@@ -14,7 +14,6 @@ def read_data(hyp_filename, gs_filename):
     return hyp, gs
 
 
-# TODO: complete alignment: for every alignment, TP if exact same is in gs
 def get_tp_fp_fn(hyp, gs):
     tp = 0
     fp = 0
@@ -68,6 +67,12 @@ def get_tp_fp_fn(hyp, gs):
 
 
 def complete_tp_fp_fn(hyp_al, gs_al):
+    """
+    Count true positives, false positives and false negatives for complete matches
+    :param hyp_al: hypothesis alignment
+    :param gs_al: goldstandard alignment
+    :return: tp, fp, fn: int
+    """
     nr_of_als = 0
     tp, fp, fn = 0, 0, 0
 
@@ -87,6 +92,12 @@ def complete_tp_fp_fn(hyp_al, gs_al):
 
 
 def partial_tp_fp_fn(hyp_al, gs_al):
+    """
+    Count true positives, false positives and false negatives for partial matches
+    :param hyp_al: hypothesis alignment
+    :param gs_al: goldstandard alignment
+    :return: tp, fp, fn: int
+    """
     tp, fp, fn = 0, 0, 0
 
     # tp and fp: partial+complete alignment
@@ -100,7 +111,6 @@ def partial_tp_fp_fn(hyp_al, gs_al):
                     break
             # if there is no tuple in the gs where one of the review sentences occurs in a tuple, no partial match
             if not matching_rev:
-                #fp += 1
                 continue
             # if there is a matching tuple where one of the rev sents occurs, check if also a matching resp exists
             matching_resp = False
@@ -110,10 +120,7 @@ def partial_tp_fp_fn(hyp_al, gs_al):
                     break
 
             if matching_rev and matching_resp:
-                #tp += 1
                 break
-            #else:
-            #    fp += 1
         if matching_rev and matching_resp:
             tp += 1
         else:
@@ -130,7 +137,6 @@ def partial_tp_fp_fn(hyp_al, gs_al):
                     break
             # if there is no tuple in the gs where one of the review sentences occurs in a tuple, no partial match
             if not matching_rev:
-                #fn += 1
                 continue
             # if there is a matching tuple where one of the rev sents occurs, check if also a matching resp exists
             matching_resp = False
@@ -140,21 +146,9 @@ def partial_tp_fp_fn(hyp_al, gs_al):
                     break
             if matching_resp:
                 break
-                #fn += 1
         if not (matching_rev and matching_resp):
             fn += 1
     return tp, fp, fn
-
-    # oder: wenn ein complete match dann tp,
-    # wenn es keiner ist dann fp und
-    # wenn es in der ref einen hat, der nicht in der hyp, dann ist es ein fn?
-
-
-    # und für partial:
-    # tp wenn ein teil der ref und der hyp übereinstimmen
-    # fp wenn nichts übereinstimmt (kein paar von hyp rev&resp sent vorhanden, das auch in gs ist)
-    # fn wenn in ref ein paar von rev&resp vorhanden, das keine entsprechung in hyp hat.
-
 
 
 def tp_fp_fn(hyp, gs):
